@@ -25,9 +25,9 @@ public sealed record ProviderDescriptor(
 /// <summary>The set of providers IOC-X knows how to build.</summary>
 /// <remarks>
 /// This catalog is the single source of truth for provider metadata. Dependency injection uses
-/// it to construct the registry, and the settings screen uses it to list providers along with
-/// their credential state — so adding a provider means adding one descriptor and one factory
-/// case, with no changes to the UI or the enrichment core.
+/// it to build the registry and the settings screen uses it to list providers with their
+/// credential state. Adding a provider means one descriptor and one factory case, with no
+/// changes to the UI or the enrichment core.
 /// <para>
 /// The rate-limit defaults are deliberately conservative rather than each service's published
 /// ceiling. They are chosen to stay well inside free-tier allowances. Consult the linked

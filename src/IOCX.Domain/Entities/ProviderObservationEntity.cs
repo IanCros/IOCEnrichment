@@ -13,11 +13,9 @@ public class ProviderObservationEntity
 
     public InvestigationEntity Investigation { get; set; } = null!;
 
-
     [Required]
     [MaxLength(100)]
     public string ProviderName { get; set; } = string.Empty;
-
 
     [Required]
     [MaxLength(50)]

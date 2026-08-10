@@ -40,7 +40,6 @@
             <TextBlock Text="Dashboard" Foreground="White" FontSize="28" FontWeight="Bold"/>
             <TextBlock Text="{Binding StatusMessage}" Foreground="#FF9E9E9E" FontSize="13" Margin="0,4,0,0"/>
 
-
             <TextBlock Text="Investigations by Risk" Style="{StaticResource SectionHeader}"/>
             <UniformGrid Columns="5">
                 <Border Style="{StaticResource StatTile}">
@@ -144,7 +143,6 @@
                                     </StackPanel>
                                 </StackPanel>
                                 <StackPanel Grid.Column="1" HorizontalAlignment="Right">
-
                                     <Border CornerRadius="4" Padding="10,4" HorizontalAlignment="Right"
                                             Background="{Binding RiskLevel, Converter={StaticResource RiskFill}}"
                                             BorderThickness="1"

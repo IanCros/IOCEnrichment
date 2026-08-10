@@ -5,11 +5,10 @@ using Microsoft.EntityFrameworkCore;
 
 /// <summary>Guards the read queries behind the Dashboard and History screens.</summary>
 /// <remarks>
-/// The SQLite provider cannot translate <c>ORDER BY</c> on a <see cref="DateTimeOffset"/>
-/// column and throws <see cref="NotSupportedException"/> when asked to. Both screens once did
-/// exactly that, caught the exception, and rendered as though no investigations existed —
-/// so investigations saved correctly but were invisible. These tests run the real query
-/// shapes against real SQLite so that failure cannot return unnoticed.
+/// SQLite cannot translate ORDER BY on a DateTimeOffset column and throws when asked to.
+/// Both screens once did exactly that, swallowed the exception, and rendered as if the
+/// database were empty. Investigations saved fine but were invisible. These run the real
+/// query shapes against real SQLite so that cannot come back unnoticed.
 /// </remarks>
 public class HistoryQueryTests : IDisposable
 {

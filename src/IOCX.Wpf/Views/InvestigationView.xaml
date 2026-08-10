@@ -108,7 +108,6 @@
                                    FontSize="15" FontWeight="SemiBold"/>
                     </StackPanel>
 
-
                     <StackPanel Grid.Column="2" Margin="24,0" VerticalAlignment="Center">
                         <TextBlock Text="Risk" Style="{StaticResource Caption}"/>
                         <Border CornerRadius="4" Padding="12,5" HorizontalAlignment="Left"

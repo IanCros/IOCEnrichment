@@ -12,6 +12,5 @@ public interface IUserSettingsStore
     /// <summary>Returns defaults when nothing has been saved yet.</summary>
     IocxOptions Load();
 
-
     void Save(IocxOptions options);
 }

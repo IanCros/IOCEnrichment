@@ -48,9 +48,8 @@ public class ProviderCatalogTests
         var registry = CreateFactory(secrets).Create(new IocxOptions());
         var allTypes = Enum.GetValues<IocType>();
 
-        // The registry filters by Supports at query time, so a catalog that overstates a
-        // provider's coverage would not break enrichment — it would quietly mislead the
-        // analyst reading the settings screen about which sources ran.
+        // The registry filters by Supports at query time, so an overstated catalog does not
+        // break enrichment. It just misleads whoever reads the settings screen.
         foreach (var provider in registry.GetAll())
         {
             var descriptor = ProviderCatalog.Find(provider.Name);

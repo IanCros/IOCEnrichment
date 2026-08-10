@@ -403,7 +403,7 @@ public class InfrastructureProvidersTests
 
         Assert.Equal(ProviderStatus.Success, result.Status);
 
-        // Addresses live under /ip/, not /domain/ — querying the wrong path returns 404.
+        // Addresses live under /ip/, not /domain/. The wrong path returns 404.
         Assert.Contains("/ip/192.0.2.1", client.LastUrl!, StringComparison.Ordinal);
         Assert.Contains("TEST-NET-1", result.NormalizedData!);
         Assert.Equal("US", result.Findings?.Infrastructure?.CountryCode);

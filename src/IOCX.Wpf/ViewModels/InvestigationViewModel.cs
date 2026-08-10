@@ -167,8 +167,8 @@ public sealed class InvestigationViewModel : INotifyPropertyChanged, IDisposable
 
     private void Render(InvestigationOutcome outcome)
     {
-        // Successes first, then failures, then providers that were not applicable — so the
-        // rows that carry evidence are at the top and the noise sinks.
+        // Successes first, then failures, then providers that never ran. Puts the rows
+        // carrying evidence at the top.
         var ordered = outcome.Results
             .OrderBy(r => r.Status switch
             {

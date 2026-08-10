@@ -8,11 +8,9 @@ using Microsoft.EntityFrameworkCore;
 /// migrations applied.
 /// </summary>
 /// <remarks>
-/// Deliberately not <c>UseInMemoryDatabase</c>. The EF in-memory provider evaluates LINQ in
-/// process, so it happily executes queries the SQLite provider cannot translate — most
-/// notably <c>ORDER BY</c> on a <see cref="DateTimeOffset"/> column, which throws at runtime.
-/// Testing against the provider the application actually ships with is the only way those
-/// failures surface before a user hits them.
+/// Deliberately not UseInMemoryDatabase. The EF in-memory provider evaluates LINQ in process,
+/// so it runs queries real SQLite rejects. ORDER BY on a DateTimeOffset column is the one that
+/// bit us. Testing against the provider we actually ship is the only way to catch those.
 /// </remarks>
 public sealed class SqliteTestContext : IDisposable
 {

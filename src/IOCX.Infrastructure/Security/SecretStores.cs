@@ -40,12 +40,12 @@ public sealed class EnvironmentSecretStore : ISecretStore
 /// Secret store that encrypts values at rest with Windows DPAPI, scoped to the current user.
 /// </summary>
 /// <remarks>
-/// Values are encrypted with <see cref="DataProtectionScope.CurrentUser"/>, so the ciphertext
-/// is only readable by the Windows account that wrote it — copying the file to another machine
-/// or account yields nothing. The file lives under the user's roaming profile rather than the
-/// repository so credentials cannot be committed by accident.
-/// This type is Windows-only; construct it through <see cref="SecretStoreFactory"/>, which
-/// falls back to an in-memory store elsewhere so the application and tests still run.
+/// Encrypted with <see cref="DataProtectionScope.CurrentUser"/>, so the file is readable only
+/// by the Windows account that wrote it. Copying it to another machine or account yields
+/// nothing. It lives in the roaming profile rather than the repository so credentials cannot
+/// be committed by accident.
+/// Windows only. Build it through <see cref="SecretStoreFactory"/>, which falls back to an
+/// in-memory store elsewhere so the application and tests still run.
 /// </remarks>
 public sealed class DpapiSecretStore : ISecretStore
 {

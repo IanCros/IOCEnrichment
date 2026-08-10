@@ -1,0 +1,41 @@
+# Sample indicators for exercising IOC-X.
+#
+# Every value here is drawn from a range or name that standards bodies reserve for
+# documentation, so nothing in this file points at real infrastructure and none of it
+# is malicious. Lines beginning with # are comments; blank lines are ignored.
+#
+#   192.0.2.0/24      TEST-NET-1        (RFC 5737)
+#   198.51.100.0/24   TEST-NET-2        (RFC 5737)
+#   203.0.113.0/24    TEST-NET-3        (RFC 5737)
+#   2001:db8::/32     documentation     (RFC 3849)
+#   example.com/.net/.org               (RFC 2606)
+
+# IPv4
+192.0.2.1
+198.51.100.42
+203.0.113.7
+
+# IPv6
+2001:db8::1
+2001:0db8:0000:0000:0000:0000:0000:0068
+
+# Domains
+example.com
+example.net
+sub.example.org
+
+# URLs
+https://example.com/login
+http://example.net/download/sample
+https://example.org/path?query=value#fragment
+
+# File hashes
+# The MD5 and SHA-1 values below are the well-known digests of the empty string, and the
+# SHA-256 is the digest of the empty string as well. They are safe, verifiable constants.
+d41d8cd98f00b204e9800998ecf8427e
+da39a3ee5e6b4b0d3255bfef95601890afd80709
+e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+
+# Email addresses
+user@example.com
+security@example.net

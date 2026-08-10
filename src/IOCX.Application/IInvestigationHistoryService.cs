@@ -27,6 +27,7 @@ public sealed record InvestigationStatistics(
 /// </summary>
 public interface IInvestigationHistoryService
 {
+    /// <summary>Newest first. A limit of zero returns everything.</summary>
     Task<IReadOnlyList<InvestigationSummary>> GetHistoryAsync(
         int limit = 0,
         CancellationToken cancellationToken = default);

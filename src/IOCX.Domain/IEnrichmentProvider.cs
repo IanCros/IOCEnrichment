@@ -59,9 +59,7 @@ public interface IEnrichmentProvider
 {
     string Name { get; }
 
-
     bool Supports(Ioc ioc);
-
 
     Task<ProviderResult> EnrichAsync(Ioc ioc, CancellationToken cancellationToken = default);
 }

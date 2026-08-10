@@ -15,8 +15,8 @@ public sealed class HttpClientWrapper : IHttpClient
         _timeout = timeout ?? TimeSpan.FromSeconds(15);
         _client.Timeout = _timeout;
 
-        // .NET sends no User-Agent by default. Several providers — RDAP registries in
-        // particular — reject such requests with 403, so identify the client explicitly.
+        // .NET sends no User-Agent by default and several RDAP registries reject those
+        // requests with 403, so identify the client explicitly.
         _client.DefaultRequestHeaders.UserAgent.ParseAdd("IOC-X/1.0 (threat-intelligence-analysis)");
     }
 

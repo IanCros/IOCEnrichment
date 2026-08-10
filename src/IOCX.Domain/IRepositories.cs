@@ -14,7 +14,7 @@ public interface IIocRepository
     /// <summary>Updates an existing IOC.</summary>
     Task UpdateAsync(IocEntity ioc, CancellationToken cancellationToken = default);
 
-
+    /// <summary>Saves changes.</summary>
     Task SaveChangesAsync(CancellationToken cancellationToken = default);
 }
 
@@ -29,7 +29,7 @@ public interface IInvestigationRepository
 
     Task<List<InvestigationEntity>> GetByIocIdAsync(Guid iocId, CancellationToken cancellationToken = default);
 
-
+    /// <summary>Saves changes.</summary>
     Task SaveChangesAsync(CancellationToken cancellationToken = default);
 }
 
@@ -39,7 +39,7 @@ public interface IObservationRepository
     /// <summary>Adds a new observation.</summary>
     Task AddAsync(ProviderObservationEntity observation, CancellationToken cancellationToken = default);
 
-
+    /// <summary>Saves changes.</summary>
     Task SaveChangesAsync(CancellationToken cancellationToken = default);
 }
 
@@ -51,6 +51,6 @@ public interface IRelationshipRepository
 
     Task<List<RelationshipEntity>> GetByIocIdAsync(Guid iocId, CancellationToken cancellationToken = default);
 
-
+    /// <summary>Saves changes.</summary>
     Task SaveChangesAsync(CancellationToken cancellationToken = default);
 }

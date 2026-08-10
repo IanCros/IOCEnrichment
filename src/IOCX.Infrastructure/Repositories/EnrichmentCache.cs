@@ -50,7 +50,7 @@ public sealed class EnrichmentCache : IEnrichmentCache
         _context.EnrichmentCacheEntries.RemoveRange(await _context.EnrichmentCacheEntries.ToListAsync(cancellationToken));
     }
 
-
+    /// <summary>Saves changes.</summary>
     public Task SaveChangesAsync(CancellationToken cancellationToken = default)
     {
         return _context.SaveChangesAsync(cancellationToken);

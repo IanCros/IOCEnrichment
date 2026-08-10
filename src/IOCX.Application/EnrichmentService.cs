@@ -25,10 +25,9 @@ public sealed class EnrichmentService : IEnrichmentService
 
         var tasks = new List<Task<ProviderResult>>();
 
-        // Report every registered provider, not only the applicable ones. A provider that
-        // cannot answer for this IOC type is recorded as Unsupported rather than omitted, so
-        // the analyst can see that it was considered and why it contributed nothing —
-        // an absent row is indistinguishable from a provider that silently failed.
+        // Report every registered provider, not just the applicable ones. A missing row
+        // looks the same as a provider that failed silently, so providers that cannot answer
+        // for this IOC type are recorded as Unsupported instead of being left out.
         var unsupported = new List<ProviderResult>();
 
         foreach (var provider in _registry.GetAll())

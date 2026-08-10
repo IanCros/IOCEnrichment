@@ -11,9 +11,7 @@ public interface ISecretStore
     /// <summary>Checks whether a secret exists without reading it.</summary>
     bool Has(string name);
 
-
     void Set(string name, string value);
-
 
     void Delete(string name);
 

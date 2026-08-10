@@ -18,7 +18,6 @@ public class RelationshipEntity
 
     public IocEntity TargetIoc { get; set; } = null!;
 
-
     [Required]
     [MaxLength(100)]
     public string RelationshipType { get; set; } = string.Empty;

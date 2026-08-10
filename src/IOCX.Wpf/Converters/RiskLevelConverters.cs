@@ -6,9 +6,8 @@ namespace IOCX.Wpf.Converters;
 
 /// <summary>The colour assigned to each risk band.</summary>
 /// <remarks>
-/// Defined once here so every screen agrees. Colour is always paired with the band's text
-/// label in the UI — an analyst must be able to read the rating without relying on colour
-/// perception, and the palette keeps a high contrast ratio against the dark background.
+/// Defined once so every screen agrees. Colour always accompanies the band name in text,
+/// never replaces it, so the rating stays readable without relying on colour perception.
 /// </remarks>
 public static class RiskPalette
 {

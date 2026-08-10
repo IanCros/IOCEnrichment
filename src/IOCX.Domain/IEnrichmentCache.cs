@@ -9,12 +9,9 @@ public interface IEnrichmentCache
 
     Task SetAsync(EnrichmentCacheEntryEntity entry, CancellationToken cancellationToken = default);
 
-
     Task RemoveAsync(string providerName, IocEntity ioc, CancellationToken cancellationToken = default);
 
-
     Task ClearAsync(CancellationToken cancellationToken = default);
-
 
     Task SaveChangesAsync(CancellationToken cancellationToken = default);
 }
