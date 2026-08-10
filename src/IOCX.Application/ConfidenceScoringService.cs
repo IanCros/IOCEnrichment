@@ -11,8 +11,15 @@ public sealed class ConfidenceScoringService : IConfidenceScoringService
         if (results == null) throw new ArgumentNullException(nameof(results));
         if (riskAssessment == null) throw new ArgumentNullException(nameof(riskAssessment));
 
-        int totalProviders = results.Count;
-        int successfulProviders = results.Count(r => r.Status == ProviderStatus.Success);
+        // A provider that cannot answer for this IOC type was never going to contribute, so
+        // it is neither a success nor a failure. Counting it as a failure would mean a domain
+        // scored lower confidence than an IP purely because AbuseIPDB and Shodan are IP-only.
+        var applicable = results
+            .Where(r => r.Status is not (ProviderStatus.Unsupported or ProviderStatus.Skipped))
+            .ToList();
+
+        int totalProviders = applicable.Count;
+        int successfulProviders = applicable.Count(r => r.Status == ProviderStatus.Success);
         int failedProviders = totalProviders - successfulProviders;
 
         // Base confidence starts at 50
