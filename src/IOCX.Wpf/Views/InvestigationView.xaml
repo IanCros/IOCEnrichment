@@ -1,0 +1,266 @@
+<UserControl x:Class="IOCX.Wpf.Views.InvestigationView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:conv="clr-namespace:IOCX.Wpf.Converters">
+    <UserControl.Resources>
+        <BooleanToVisibilityConverter x:Key="BoolToVisibility"/>
+        <conv:RiskLevelToBrushConverter x:Key="RiskAccent"/>
+        <conv:RiskLevelToFillConverter x:Key="RiskFill"/>
+
+        <Style x:Key="Caption" TargetType="TextBlock">
+            <Setter Property="Foreground" Value="#FF8E8E8E"/>
+            <Setter Property="FontSize" Value="11"/>
+            <Setter Property="Margin" Value="0,0,0,3"/>
+        </Style>
+
+        <Style x:Key="Card" TargetType="Border">
+            <Setter Property="Background" Value="#FF2D2D2D"/>
+            <Setter Property="CornerRadius" Value="6"/>
+            <Setter Property="Padding" Value="16"/>
+            <Setter Property="Margin" Value="0,0,0,10"/>
+        </Style>
+
+        <Style x:Key="ActionButton" TargetType="Button">
+            <Setter Property="Background" Value="#FF3D6FA8"/>
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Padding" Value="18,8"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Margin" Value="8,0,0,0"/>
+        </Style>
+
+        <Style x:Key="SubtleButton" TargetType="Button" BasedOn="{StaticResource ActionButton}">
+            <Setter Property="Background" Value="#FF444444"/>
+        </Style>
+
+    </UserControl.Resources>
+
+    <Grid Background="#FF1E1E1E">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+        </Grid.RowDefinitions>
+
+        <!-- Header and input -->
+        <StackPanel Grid.Row="0" Margin="24,24,24,0">
+            <TextBlock Text="Investigate" Foreground="White" FontSize="28" FontWeight="Bold"/>
+            <TextBlock Text="Enter an IP address, domain, URL, file hash, or email address."
+                       Foreground="#FF9E9E9E" FontSize="13" Margin="0,4,0,0"/>
+        </StackPanel>
+
+        <StackPanel Grid.Row="1" Margin="24,16,24,0">
+            <StackPanel Orientation="Horizontal">
+                <TextBox Width="440" Padding="9,7" FontSize="13"
+                         Background="#FF2D2D2D" Foreground="White" BorderBrush="#FF4A4A4A"
+                         VerticalContentAlignment="Center"
+                         Text="{Binding InputText, UpdateSourceTrigger=PropertyChanged}">
+                    <TextBox.InputBindings>
+                        <KeyBinding Key="Return" Command="{Binding AnalyzeCommand}"/>
+                    </TextBox.InputBindings>
+                </TextBox>
+                <Button Content="Analyze" Style="{StaticResource ActionButton}"
+                        Command="{Binding AnalyzeCommand}" IsDefault="True"/>
+                <Button Content="Cancel" Style="{StaticResource SubtleButton}"
+                        Command="{Binding CancelCommand}"/>
+            </StackPanel>
+
+            <!-- Progress and status -->
+            <ProgressBar Height="3" Margin="0,12,0,0" IsIndeterminate="True"
+                         Background="Transparent" Foreground="#FF3D6FA8" BorderThickness="0"
+                         Visibility="{Binding IsAnalyzing, Converter={StaticResource BoolToVisibility}}"/>
+            <TextBlock Text="{Binding StatusMessage}" Foreground="#FF9E9E9E"
+                       FontSize="12" Margin="0,8,0,0" TextWrapping="Wrap"/>
+        </StackPanel>
+
+        <!-- Results -->
+        <Grid Grid.Row="2" Margin="24,16,24,24"
+              Visibility="{Binding HasResult, Converter={StaticResource BoolToVisibility}}">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="*"/>
+            </Grid.RowDefinitions>
+
+            <!-- Assessment banner -->
+            <Border Grid.Row="0" Style="{StaticResource Card}">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+
+                    <StackPanel Grid.Column="0" VerticalAlignment="Center">
+                        <TextBlock Text="Indicator" Style="{StaticResource Caption}"/>
+                        <TextBlock Text="{Binding NormalizedValue}" Foreground="White"
+                                   FontSize="16" FontWeight="SemiBold" TextWrapping="Wrap"/>
+                        <TextBlock Foreground="#FF7E7E7E" FontSize="11" Margin="0,4,0,0"
+                                   TextWrapping="Wrap">
+                            <Run Text="As entered:"/>
+                            <Run Text="{Binding OriginalValue, Mode=OneWay}"/>
+                        </TextBlock>
+                    </StackPanel>
+
+                    <StackPanel Grid.Column="1" Margin="24,0" VerticalAlignment="Center">
+                        <TextBlock Text="Type" Style="{StaticResource Caption}"/>
+                        <TextBlock Text="{Binding DetectedType}" Foreground="White"
+                                   FontSize="15" FontWeight="SemiBold"/>
+                    </StackPanel>
+
+
+                    <StackPanel Grid.Column="2" Margin="24,0" VerticalAlignment="Center">
+                        <TextBlock Text="Risk" Style="{StaticResource Caption}"/>
+                        <Border CornerRadius="4" Padding="12,5" HorizontalAlignment="Left"
+                                Background="{Binding RiskLevel, Converter={StaticResource RiskFill}}"
+                                BorderThickness="1"
+                                BorderBrush="{Binding RiskLevel, Converter={StaticResource RiskAccent}}">
+                            <TextBlock Text="{Binding RiskLevel}" FontSize="20" FontWeight="Bold"
+                                       Foreground="{Binding RiskLevel, Converter={StaticResource RiskAccent}}"/>
+                        </Border>
+                        <TextBlock Text="{Binding RiskScore, StringFormat={}{0}/100}"
+                                   Foreground="#FF9E9E9E" FontSize="11" Margin="0,4,0,0"/>
+                    </StackPanel>
+
+                    <StackPanel Grid.Column="3" Margin="24,0,0,0" VerticalAlignment="Center">
+                        <TextBlock Text="Confidence" Style="{StaticResource Caption}"/>
+                        <TextBlock Text="{Binding ConfidenceScore, StringFormat={}{0}%}"
+                                   Foreground="#FF6FCF5A" FontSize="26" FontWeight="Bold"/>
+                    </StackPanel>
+                </Grid>
+            </Border>
+
+            <TabControl Grid.Row="1" Background="Transparent" BorderThickness="0">
+                <TabItem Header="Overview">
+                    <ScrollViewer Margin="0,12,0,0" VerticalScrollBarVisibility="Auto">
+                        <Border Style="{StaticResource Card}">
+                            <StackPanel>
+                                <TextBlock Text="Executive summary" Foreground="White"
+                                           FontSize="14" FontWeight="SemiBold" Margin="0,0,0,8"/>
+                                <TextBlock Text="{Binding Summary}" Foreground="#FFD8D8D8"
+                                           FontSize="13" TextWrapping="Wrap" LineHeight="20"/>
+                            </StackPanel>
+                        </Border>
+                    </ScrollViewer>
+                </TabItem>
+
+                <TabItem Header="Evidence">
+                    <ScrollViewer Margin="0,12,0,0" VerticalScrollBarVisibility="Auto">
+                        <ItemsControl ItemsSource="{Binding Evidence}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <Border Style="{StaticResource Card}">
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="Auto"/>
+                                            </Grid.ColumnDefinitions>
+                                            <StackPanel Grid.Column="0">
+                                                <StackPanel Orientation="Horizontal">
+                                                    <Border Background="#FF3D3D3D" CornerRadius="3" Padding="6,2">
+                                                        <TextBlock Text="{Binding Severity}"
+                                                                   Foreground="#FFD8D8D8" FontSize="10"/>
+                                                    </Border>
+                                                    <TextBlock Text="{Binding Category}" Foreground="#FF8E8E8E"
+                                                               FontSize="11" Margin="8,2,0,0"/>
+                                                </StackPanel>
+                                                <TextBlock Text="{Binding Description}" Foreground="White"
+                                                           FontSize="13" TextWrapping="Wrap" Margin="0,7,0,0"/>
+                                                <TextBlock Text="{Binding Provider}" Foreground="#FF7E7E7E"
+                                                           FontSize="11" Margin="0,4,0,0"/>
+                                            </StackPanel>
+                                            <TextBlock Grid.Column="1" VerticalAlignment="Center"
+                                                       Text="{Binding ScoreContribution, StringFormat=+{0}}"
+                                                       Foreground="#FFE0A33C" FontSize="17" FontWeight="Bold"
+                                                       Margin="16,0,0,0"/>
+                                        </Grid>
+                                    </Border>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </ScrollViewer>
+                </TabItem>
+
+                <TabItem Header="Providers">
+                    <ScrollViewer Margin="0,12,0,0" VerticalScrollBarVisibility="Auto">
+                        <ItemsControl ItemsSource="{Binding ProviderResults}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <Border Background="#FF2D2D2D" CornerRadius="6" Margin="0,0,0,8">
+                                        <Expander Padding="12" Background="Transparent" Foreground="White">
+                                            <Expander.Header>
+                                                <StackPanel Orientation="Horizontal">
+                                                    <TextBlock Text="{Binding ProviderName}" Foreground="White"
+                                                               FontSize="13" FontWeight="SemiBold" Width="120"/>
+                                                    <TextBlock Text="{Binding Status}" FontSize="12">
+                                                        <TextBlock.Style>
+                                                            <Style TargetType="TextBlock">
+                                                                <!-- Green ran, amber failed, grey never queried. -->
+                                                                <Setter Property="Foreground" Value="#FFE0A33C"/>
+                                                                <Style.Triggers>
+                                                                    <DataTrigger Binding="{Binding Succeeded}" Value="True">
+                                                                        <Setter Property="Foreground" Value="#FF6FCF5A"/>
+                                                                    </DataTrigger>
+                                                                    <DataTrigger Binding="{Binding NotApplicable}" Value="True">
+                                                                        <Setter Property="Foreground" Value="#FF7E7E7E"/>
+                                                                    </DataTrigger>
+                                                                </Style.Triggers>
+                                                            </Style>
+                                                        </TextBlock.Style>
+                                                    </TextBlock>
+                                                    <TextBlock Text="{Binding DurationMs, StringFormat={}{0} ms}"
+                                                               Foreground="#FF7E7E7E" FontSize="11" Margin="12,1,0,0"/>
+                                                </StackPanel>
+                                            </Expander.Header>
+                                            <TextBlock Text="{Binding Data}" Foreground="#FFD8D8D8"
+                                                       FontFamily="Consolas" FontSize="12"
+                                                       TextWrapping="Wrap" Margin="0,10,0,4"/>
+                                        </Expander>
+                                    </Border>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </ScrollViewer>
+                </TabItem>
+
+                <TabItem Header="Relationships">
+                    <ScrollViewer Margin="0,12,0,0" VerticalScrollBarVisibility="Auto">
+                        <StackPanel>
+                            <!-- Empty state -->
+                            <TextBlock Text="No relationships were discovered for this indicator."
+                                       Foreground="#FF7E7E7E" FontSize="12" Margin="4">
+                                <TextBlock.Style>
+                                    <Style TargetType="TextBlock">
+                                        <Setter Property="Visibility" Value="Collapsed"/>
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding Relationships.Count}" Value="0">
+                                                <Setter Property="Visibility" Value="Visible"/>
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </TextBlock.Style>
+                            </TextBlock>
+                            <ItemsControl ItemsSource="{Binding Relationships}">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate>
+                                        <Border Style="{StaticResource Card}">
+                                            <StackPanel>
+                                                <TextBlock Text="{Binding Type}" Foreground="White" FontSize="13"/>
+                                                <TextBlock Foreground="#FF7E7E7E" FontSize="11" Margin="0,4,0,0">
+                                                    <Run Text="{Binding Provider, Mode=OneWay}"/>
+                                                    <Run Text="  •  confidence"/>
+                                                    <Run Text="{Binding Confidence, Mode=OneWay}"/>
+                                                    <Run Text="%"/>
+                                                </TextBlock>
+                                            </StackPanel>
+                                        </Border>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </StackPanel>
+                    </ScrollViewer>
+                </TabItem>
+            </TabControl>
+        </Grid>
+    </Grid>
+</UserControl>
