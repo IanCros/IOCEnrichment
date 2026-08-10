@@ -9,10 +9,17 @@ public sealed class ThreatFoxProvider : IEnrichmentProvider
     private readonly IHttpClient _httpClient;
     private readonly IRateLimiter _rateLimiter;
 
-    public ThreatFoxProvider(IHttpClient httpClient, IRateLimiter rateLimiter)
+    /// <summary>
+    /// abuse.ch requires an Auth-Key header on every ThreatFox request. Free keys are issued
+    /// at https://auth.abuse.ch/. Requests without one are rejected with 401.
+    /// </summary>
+    private readonly string? _authKey;
+
+    public ThreatFoxProvider(IHttpClient httpClient, IRateLimiter rateLimiter, string? authKey = null)
     {
         _httpClient = httpClient ?? throw new ArgumentNullException(nameof(httpClient));
         _rateLimiter = rateLimiter ?? throw new ArgumentNullException(nameof(rateLimiter));
+        _authKey = authKey;
     }
 
     /// <inheritdoc />
@@ -61,7 +68,13 @@ public sealed class ThreatFoxProvider : IEnrichmentProvider
                 search_term = ioc.NormalizedValue
             });
 
-            var response = await _httpClient.PostAsync(url, requestBody, cancellationToken);
+            var headers = new Dictionary<string, string> { ["Accept"] = "application/json" };
+            if (!string.IsNullOrWhiteSpace(_authKey))
+            {
+                headers["Auth-Key"] = _authKey;
+            }
+
+            var response = await _httpClient.PostAsync(url, requestBody, headers, cancellationToken);
             var duration = (long)(DateTimeOffset.UtcNow - startTime).TotalMilliseconds;
 
             return response.StatusCode switch
@@ -138,7 +151,8 @@ public sealed class ThreatFoxProvider : IEnrichmentProvider
                     Status = ProviderStatus.Success,
                     Timestamp = DateTimeOffset.UtcNow,
                     Duration = duration,
-                    NormalizedData = "No ThreatFox matches found."
+                    NormalizedData = "No ThreatFox matches found.",
+                    Findings = new ProviderFindings { ThreatMatches = new ThreatMatchFacts(0) }
                 };
             }
 
@@ -160,6 +174,11 @@ public sealed class ThreatFoxProvider : IEnrichmentProvider
             var sb = new System.Text.StringBuilder();
             sb.AppendLine($"Matches: {matchCount}");
 
+            var families = new List<string>();
+            var tags = new List<string>();
+            DateTimeOffset? earliestSeen = null;
+            DateTimeOffset? latestSeen = null;
+
             for (int idx = 0; idx < matchCount; idx++)
             {
                 var match = matches[idx];
@@ -169,6 +188,35 @@ public sealed class ThreatFoxProvider : IEnrichmentProvider
                 var lastSeen = match.TryGetProperty("last_seen", out var l) ? l.GetString() : null;
                 var iocValue = match.TryGetProperty("ioc", out var iocProp) ? iocProp.GetString() : null;
                 var iocType = match.TryGetProperty("ioc_type", out var t) ? t.GetString() : null;
+
+                if (!string.IsNullOrWhiteSpace(malware) && !families.Contains(malware, StringComparer.OrdinalIgnoreCase))
+                {
+                    families.Add(malware);
+                }
+
+                if (match.TryGetProperty("tags", out var tagsProp) && tagsProp.ValueKind == System.Text.Json.JsonValueKind.Array)
+                {
+                    foreach (var tag in tagsProp.EnumerateArray())
+                    {
+                        var tagValue = tag.GetString();
+                        if (!string.IsNullOrWhiteSpace(tagValue) && !tags.Contains(tagValue, StringComparer.OrdinalIgnoreCase))
+                        {
+                            tags.Add(tagValue);
+                        }
+                    }
+                }
+
+                if (DateTimeOffset.TryParse(firstSeen, out var parsedFirst)
+                    && (earliestSeen is null || parsedFirst < earliestSeen))
+                {
+                    earliestSeen = parsedFirst;
+                }
+
+                if (DateTimeOffset.TryParse(lastSeen, out var parsedLast)
+                    && (latestSeen is null || parsedLast > latestSeen))
+                {
+                    latestSeen = parsedLast;
+                }
 
                 sb.AppendLine();
                 sb.AppendLine($"{idx + 1}.");
@@ -195,7 +243,17 @@ public sealed class ThreatFoxProvider : IEnrichmentProvider
                 Status = ProviderStatus.Success,
                 Timestamp = DateTimeOffset.UtcNow,
                 Duration = duration,
-                NormalizedData = sb.ToString().TrimEnd()
+                NormalizedData = sb.ToString().TrimEnd(),
+                Findings = new ProviderFindings
+                {
+                    ThreatMatches = new ThreatMatchFacts(
+                        matchCount,
+                        families,
+                        tags,
+                        earliestSeen,
+                        latestSeen),
+                    LastActivityAt = latestSeen
+                }
             };
         }
         catch

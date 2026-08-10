@@ -26,7 +26,8 @@ public sealed class RdapProvider : IEnrichmentProvider
             throw new ArgumentNullException(nameof(ioc));
         }
 
-        return ioc.Type is IocType.Domain;
+        // RDAP serves both domain registrations and IP allocations, on different paths.
+        return ioc.Type is IocType.Domain or IocType.IPv4 or IocType.IPv6;
     }
 
     /// <inheritdoc />
@@ -52,14 +53,22 @@ public sealed class RdapProvider : IEnrichmentProvider
         {
             await _rateLimiter.WaitAsync(cancellationToken);
 
-            var url = $"https://rdap.org/domain/{Uri.EscapeDataString(ioc.NormalizedValue)}";
+            // Addresses resolve to their allocation record, domains to their registration.
+            var path = ioc.Type is IocType.IPv4 or IocType.IPv6 ? "ip" : "domain";
+            var url = $"https://rdap.org/{path}/{Uri.EscapeDataString(ioc.NormalizedValue)}";
             var startTime = DateTimeOffset.UtcNow;
-            var response = await _httpClient.GetAsync(url, cancellationToken);
+            // RDAP has its own media type and registries may reject a plain */* Accept.
+            var headers = new Dictionary<string, string>
+            {
+                ["Accept"] = "application/rdap+json, application/json"
+            };
+
+            var response = await _httpClient.GetAsync(url, headers, cancellationToken);
             var duration = (long)(DateTimeOffset.UtcNow - startTime).TotalMilliseconds;
 
             return response.StatusCode switch
             {
-                System.Net.HttpStatusCode.OK => ProcessSuccessResponse(response.Content!, duration),
+                System.Net.HttpStatusCode.OK => ProcessSuccessResponse(response.Content!, duration, ioc),
                 System.Net.HttpStatusCode.NotFound => new ProviderResult
                 {
                     ProviderName = Name,
@@ -116,13 +125,14 @@ public sealed class RdapProvider : IEnrichmentProvider
         }
     }
 
-    private ProviderResult ProcessSuccessResponse(string content, long duration)
+    private ProviderResult ProcessSuccessResponse(string content, long duration, Ioc ioc)
     {
         try
         {
             var data = System.Text.Json.JsonDocument.Parse(content);
             var root = data.RootElement;
 
+            var isAddress = ioc.Type is IocType.IPv4 or IocType.IPv6;
             var handle = root.TryGetProperty("handle", out var h) ? h.GetString() : null;
             var registrar = root.TryGetProperty("entities", out var entities) && entities.GetArrayLength() > 0
                 ? ExtractRegistrar(entities) : null;
@@ -138,10 +148,30 @@ public sealed class RdapProvider : IEnrichmentProvider
             var statuses = root.TryGetProperty("status", out var st) && st.GetArrayLength() > 0
                 ? st.EnumerateArray().Select(x => x.GetString()).Where(x => x is not null).ToArray() : Array.Empty<string>();
 
+            // Address allocations carry a network name and range instead of nameservers.
+            var networkName = root.TryGetProperty("name", out var n) ? n.GetString() : null;
+            var country = root.TryGetProperty("country", out var c) ? c.GetString() : null;
+            var startAddress = root.TryGetProperty("startAddress", out var sa) ? sa.GetString() : null;
+            var endAddress = root.TryGetProperty("endAddress", out var ea) ? ea.GetString() : null;
+
             var sb = new System.Text.StringBuilder();
 
-            sb.AppendLine($"Domain handle: {handle ?? "Unknown"}");
-            if (!string.IsNullOrEmpty(registrar)) sb.AppendLine($"Registrar: {registrar}");
+            sb.AppendLine(isAddress
+                ? $"Network handle: {handle ?? "Unknown"}"
+                : $"Domain handle: {handle ?? "Unknown"}");
+
+            if (!string.IsNullOrEmpty(networkName)) sb.AppendLine($"Network: {networkName}");
+            if (!string.IsNullOrEmpty(startAddress) && !string.IsNullOrEmpty(endAddress))
+            {
+                sb.AppendLine($"Range: {startAddress} - {endAddress}");
+            }
+
+            if (!string.IsNullOrEmpty(country)) sb.AppendLine($"Country: {country}");
+            if (!string.IsNullOrEmpty(registrar))
+            {
+                sb.AppendLine(isAddress ? $"Organization: {registrar}" : $"Registrar: {registrar}");
+            }
+
             if (!string.IsNullOrEmpty(creationDate)) sb.AppendLine($"Created: {creationDate}");
             if (!string.IsNullOrEmpty(lastChanged)) sb.AppendLine($"Last Changed: {lastChanged}");
 
@@ -157,13 +187,37 @@ public sealed class RdapProvider : IEnrichmentProvider
                 foreach (var s in statuses) sb.AppendLine($"  {s}");
             }
 
+            DateTimeOffset.TryParse(creationDate, out var registeredAt);
+            DateTimeOffset.TryParse(lastChanged, out var updatedAt);
+
+            var findings = isAddress
+                ? new ProviderFindings
+                {
+                    Infrastructure = new InfrastructureFacts(
+                        Organization: registrar ?? networkName,
+                        CountryCode: country)
+                }
+                : new ProviderFindings
+                {
+                    Registration = new RegistrationFacts(
+                        Registrar: registrar,
+                        RegisteredAt: registeredAt == default ? null : registeredAt,
+                        UpdatedAt: updatedAt == default ? null : updatedAt,
+                        Nameservers: nameservers!,
+                        Statuses: statuses!,
+                        // Registrars withhold contact details under GDPR. Record that it
+                        // happened rather than treating the gap as missing data.
+                        IsPrivacyRedacted: content.Contains("REDACTED", StringComparison.OrdinalIgnoreCase))
+                };
+
             return new ProviderResult
             {
                 ProviderName = Name,
                 Status = ProviderStatus.Success,
                 Timestamp = DateTimeOffset.UtcNow,
                 Duration = duration,
-                NormalizedData = sb.ToString().TrimEnd()
+                NormalizedData = sb.ToString().TrimEnd(),
+                Findings = findings
             };
         }
         catch

@@ -57,11 +57,14 @@ public sealed class AbuseIpDbProvider : IEnrichmentProvider
             var url = $"https://api.abuseipdb.com/api/v2/check?ipAddress={Uri.EscapeDataString(ioc.NormalizedValue)}&maxAgeInDays=90";
             var startTime = DateTimeOffset.UtcNow;
 
-            using var request = new HttpRequestMessage(HttpMethod.Get, url);
-            request.Headers.Add("Key", _apiKey);
-            request.Headers.Add("Accept", "application/json");
+            // AbuseIPDB authenticates with the Key header.
+            var headers = new Dictionary<string, string>
+            {
+                ["Key"] = _apiKey,
+                ["Accept"] = "application/json"
+            };
 
-            var response = await _httpClient.GetAsync(url, cancellationToken);
+            var response = await _httpClient.GetAsync(url, headers, cancellationToken);
             var duration = (long)(DateTimeOffset.UtcNow - startTime).TotalMilliseconds;
 
             return response.StatusCode switch
@@ -153,13 +156,38 @@ public sealed class AbuseIpDbProvider : IEnrichmentProvider
                 normalizedData += $"\nASN: AS{asn.Value} ({asnOrg})";
             }
 
+            var totalReports = result.TryGetProperty("totalReports", out var reportsProp)
+                ? reportsProp.GetInt32()
+                : (int?)null;
+            var usageType = result.TryGetProperty("usageType", out var usageProp) ? usageProp.GetString() : null;
+            var lastReportedAt = result.TryGetProperty("lastReportedAt", out var lastProp)
+                && DateTimeOffset.TryParse(lastProp.GetString(), out var parsedLastReported)
+                    ? parsedLastReported
+                    : (DateTimeOffset?)null;
+
+            var related = new List<RelatedIndicator>();
+            if (!string.IsNullOrWhiteSpace(domain))
+            {
+                related.Add(new RelatedIndicator(domain, IocType.Domain, RelationshipType.RelatedTo, 60));
+            }
+
             return new ProviderResult
             {
                 ProviderName = Name,
                 Status = ProviderStatus.Success,
                 Timestamp = DateTimeOffset.UtcNow,
                 Duration = duration,
-                NormalizedData = normalizedData
+                NormalizedData = normalizedData,
+                Findings = new ProviderFindings
+                {
+                    Abuse = new AbuseFacts(abuseScore, totalReports, lastReportedAt, usageType),
+                    Infrastructure = new InfrastructureFacts(
+                        Organization: asnOrg ?? isp,
+                        Asn: asn.HasValue ? $"AS{asn.Value}" : null,
+                        CountryCode: country),
+                    Related = related,
+                    LastActivityAt = lastReportedAt
+                }
             };
         }
         catch

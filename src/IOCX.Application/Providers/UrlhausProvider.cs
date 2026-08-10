@@ -9,10 +9,17 @@ public sealed class UrlhausProvider : IEnrichmentProvider
     private readonly IHttpClient _httpClient;
     private readonly IRateLimiter _rateLimiter;
 
-    public UrlhausProvider(IHttpClient httpClient, IRateLimiter rateLimiter)
+    /// <summary>
+    /// abuse.ch requires an Auth-Key header on every URLhaus request. Free keys are issued
+    /// at https://auth.abuse.ch/. Requests without one are rejected with 401.
+    /// </summary>
+    private readonly string? _authKey;
+
+    public UrlhausProvider(IHttpClient httpClient, IRateLimiter rateLimiter, string? authKey = null)
     {
         _httpClient = httpClient ?? throw new ArgumentNullException(nameof(httpClient));
         _rateLimiter = rateLimiter ?? throw new ArgumentNullException(nameof(rateLimiter));
+        _authKey = authKey;
     }
 
     /// <inheritdoc />
@@ -69,7 +76,13 @@ public sealed class UrlhausProvider : IEnrichmentProvider
                 });
             }
 
-            var response = await _httpClient.PostAsync(url, requestBody, cancellationToken);
+            var headers = new Dictionary<string, string> { ["Accept"] = "application/json" };
+            if (!string.IsNullOrWhiteSpace(_authKey))
+            {
+                headers["Auth-Key"] = _authKey;
+            }
+
+            var response = await _httpClient.PostAsync(url, requestBody, headers, cancellationToken);
             var duration = (long)(DateTimeOffset.UtcNow - startTime).TotalMilliseconds;
 
             return response.StatusCode switch
@@ -148,7 +161,8 @@ public sealed class UrlhausProvider : IEnrichmentProvider
                     Status = ProviderStatus.Success,
                     Timestamp = DateTimeOffset.UtcNow,
                     Duration = duration,
-                    NormalizedData = "No URLhaus matches found."
+                    NormalizedData = "No URLhaus matches found.",
+                    Findings = new ProviderFindings { ThreatMatches = new ThreatMatchFacts(0) }
                 };
             }
 
@@ -183,6 +197,12 @@ public sealed class UrlhausProvider : IEnrichmentProvider
             var sb = new System.Text.StringBuilder();
             sb.AppendLine($"Matches: {results.Count}");
 
+            var families = new List<string>();
+            var allTags = new List<string>();
+            var related = new List<RelatedIndicator>();
+            var anyOnline = false;
+            DateTimeOffset? latestSeen = null;
+
             foreach (var result in results)
             {
                 var url = result.TryGetProperty("url", out var urlProp) ? urlProp.GetString() : null;
@@ -210,6 +230,40 @@ public sealed class UrlhausProvider : IEnrichmentProvider
                 {
                     sb.AppendLine("Tags: " + string.Join(", ", tags));
                 }
+
+                if (!string.IsNullOrWhiteSpace(malware) && !families.Contains(malware, StringComparer.OrdinalIgnoreCase))
+                {
+                    families.Add(malware);
+                }
+
+                foreach (var tag in tags)
+                {
+                    if (!string.IsNullOrWhiteSpace(tag) && !allTags.Contains(tag, StringComparer.OrdinalIgnoreCase))
+                    {
+                        allTags.Add(tag);
+                    }
+                }
+
+                if (string.Equals(urlStatus, "online", StringComparison.OrdinalIgnoreCase))
+                {
+                    anyOnline = true;
+                }
+
+                if (DateTimeOffset.TryParse(dateAdded, out var parsedAdded)
+                    && (latestSeen is null || parsedAdded > latestSeen))
+                {
+                    latestSeen = parsedAdded;
+                }
+
+                if (!string.IsNullOrWhiteSpace(ip))
+                {
+                    related.Add(new RelatedIndicator(ip, null, RelationshipType.HostedOn, 80));
+                }
+
+                if (!string.IsNullOrWhiteSpace(host))
+                {
+                    related.Add(new RelatedIndicator(host, null, RelationshipType.RelatedTo, 70));
+                }
             }
 
             return new ProviderResult
@@ -218,7 +272,19 @@ public sealed class UrlhausProvider : IEnrichmentProvider
                 Status = ProviderStatus.Success,
                 Timestamp = DateTimeOffset.UtcNow,
                 Duration = duration,
-                NormalizedData = sb.ToString().TrimEnd()
+                NormalizedData = sb.ToString().TrimEnd(),
+                Findings = new ProviderFindings
+                {
+                    ThreatMatches = new ThreatMatchFacts(
+                        results.Count,
+                        families,
+                        allTags,
+                        FirstSeen: null,
+                        LastSeen: latestSeen,
+                        IsActive: anyOnline),
+                    Related = related,
+                    LastActivityAt = latestSeen
+                }
             };
         }
         catch

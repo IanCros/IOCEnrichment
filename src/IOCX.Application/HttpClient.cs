@@ -14,14 +14,24 @@ public sealed class HttpClientWrapper : IHttpClient
         _client = handler is null ? new HttpClient() : new HttpClient(handler);
         _timeout = timeout ?? TimeSpan.FromSeconds(15);
         _client.Timeout = _timeout;
+
+        // .NET sends no User-Agent by default. Several providers — RDAP registries in
+        // particular — reject such requests with 403, so identify the client explicitly.
+        _client.DefaultRequestHeaders.UserAgent.ParseAdd("IOC-X/1.0 (threat-intelligence-analysis)");
     }
 
     /// <inheritdoc />
-    public async Task<HttpResponseResult> GetAsync(string url, CancellationToken cancellationToken = default)
+    public async Task<HttpResponseResult> GetAsync(
+        string url,
+        IReadOnlyDictionary<string, string>? headers = null,
+        CancellationToken cancellationToken = default)
     {
         try
         {
-            using var response = await _client.GetAsync(url, cancellationToken);
+            using var request = new HttpRequestMessage(HttpMethod.Get, url);
+            ApplyHeaders(request, headers);
+
+            using var response = await _client.SendAsync(request, cancellationToken);
             var content = await response.Content.ReadAsStringAsync(cancellationToken);
 
             return new HttpResponseResult
@@ -50,11 +60,16 @@ public sealed class HttpClientWrapper : IHttpClient
     }
 
     /// <inheritdoc />
-    public async Task<HttpResponseResult> PostAsync(string url, string? content = null, CancellationToken cancellationToken = default)
+    public async Task<HttpResponseResult> PostAsync(
+        string url,
+        string? content = null,
+        IReadOnlyDictionary<string, string>? headers = null,
+        CancellationToken cancellationToken = default)
     {
         try
         {
             using var request = new HttpRequestMessage(HttpMethod.Post, url);
+            ApplyHeaders(request, headers);
 
             if (content is not null)
             {
@@ -86,6 +101,24 @@ public sealed class HttpClientWrapper : IHttpClient
                 StatusCode = HttpStatusCode.ServiceUnavailable,
                 ErrorMessage = $"HTTP error: {ex.Message}"
             };
+        }
+    }
+
+    /// <summary>Applies caller-supplied headers to a request.</summary>
+    /// <remarks>
+    /// Headers are set per request rather than on the shared <see cref="HttpClient"/>, so one
+    /// provider's credentials can never be sent to a different provider's endpoint.
+    /// </remarks>
+    private static void ApplyHeaders(HttpRequestMessage request, IReadOnlyDictionary<string, string>? headers)
+    {
+        if (headers is null)
+        {
+            return;
+        }
+
+        foreach (var (name, value) in headers)
+        {
+            request.Headers.TryAddWithoutValidation(name, value);
         }
     }
 

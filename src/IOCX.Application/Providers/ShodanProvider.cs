@@ -56,7 +56,8 @@ public sealed class ShodanProvider : IEnrichmentProvider
 
             var url = $"https://api.shodan.io/shodan/host/{ioc.NormalizedValue}?key={Uri.EscapeDataString(_apiKey)}";
             var startTime = DateTimeOffset.UtcNow;
-            var response = await _httpClient.GetAsync(url, cancellationToken);
+            // Shodan authenticates with a query-string parameter rather than a header.
+            var response = await _httpClient.GetAsync(url, headers: null, cancellationToken);
             var duration = (long)(DateTimeOffset.UtcNow - startTime).TotalMilliseconds;
 
             return response.StatusCode switch

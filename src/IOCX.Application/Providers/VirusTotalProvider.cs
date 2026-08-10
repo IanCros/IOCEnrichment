@@ -45,7 +45,15 @@ public sealed class VirusTotalProvider : IEnrichmentProvider
 
             var url = BuildUrl(ioc);
             var startTime = DateTimeOffset.UtcNow;
-            var response = await _httpClient.GetAsync(url, cancellationToken);
+
+            // VirusTotal authenticates with the x-apikey header on every request.
+            var headers = new Dictionary<string, string>
+            {
+                ["x-apikey"] = _apiKey,
+                ["Accept"] = "application/json"
+            };
+
+            var response = await _httpClient.GetAsync(url, headers, cancellationToken);
             var duration = (long)(DateTimeOffset.UtcNow - startTime).TotalMilliseconds;
 
             return response.StatusCode switch
@@ -147,13 +155,23 @@ public sealed class VirusTotalProvider : IEnrichmentProvider
                 normalizedData += $"\nReputation: {reputation.Value}";
             }
 
+            var lastAnalysis = attributes.TryGetProperty("last_analysis_date", out var analysed)
+                && analysed.TryGetInt64(out var epochSeconds)
+                    ? DateTimeOffset.FromUnixTimeSeconds(epochSeconds)
+                    : (DateTimeOffset?)null;
+
             return new ProviderResult
             {
                 ProviderName = Name,
                 Status = ProviderStatus.Success,
                 Timestamp = DateTimeOffset.UtcNow,
                 Duration = duration,
-                NormalizedData = normalizedData
+                NormalizedData = normalizedData,
+                Findings = new ProviderFindings
+                {
+                    Detections = new DetectionFacts(malicious, suspicious, harmless, undetected, reputation),
+                    LastActivityAt = lastAnalysis
+                }
             };
         }
         catch

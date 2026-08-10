@@ -20,9 +20,16 @@ public sealed class HttpResponseResult
 /// </summary>
 public interface IHttpClient : IDisposable
 {
-    /// <summary>Sends a GET request.</summary>
-    Task<HttpResponseResult> GetAsync(string url, CancellationToken cancellationToken = default);
 
-    /// <summary>Sends a POST request.</summary>
-    Task<HttpResponseResult> PostAsync(string url, string? content = null, CancellationToken cancellationToken = default);
+    Task<HttpResponseResult> GetAsync(
+        string url,
+        IReadOnlyDictionary<string, string>? headers = null,
+        CancellationToken cancellationToken = default);
+
+
+    Task<HttpResponseResult> PostAsync(
+        string url,
+        string? content = null,
+        IReadOnlyDictionary<string, string>? headers = null,
+        CancellationToken cancellationToken = default);
 }
