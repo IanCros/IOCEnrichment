@@ -1,0 +1,100 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+env:
+  DOTNET_NOLOGO: true
+  DOTNET_SKIP_FIRST_TIME_EXPERIENCE: true
+  DOTNET_CLI_TELEMETRY_OPTOUT: true
+
+jobs:
+  build:
+    # The desktop project targets net8.0-windows and uses WPF, so the solution can only be
+    # built on a Windows runner. No step requires an API key: the test suite is fully mocked.
+    runs-on: windows-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Restore
+        run: dotnet restore IOCX.sln
+
+      - name: Verify formatting
+        run: dotnet format IOCX.sln --verify-no-changes --no-restore --verbosity diagnostic
+        continue-on-error: true
+
+      - name: Build
+        run: dotnet build IOCX.sln --configuration Release --no-restore
+
+      - name: Test
+        run: dotnet test IOCX.sln --configuration Release --no-build --verbosity normal
+
+      - name: Verify Windows publish
+        run: >
+          dotnet publish src/IOCX.Wpf/IOCX.Wpf.csproj
+          --configuration Release
+          --runtime win-x64
+          --self-contained true
+          --output ./publish
+
+      - name: Upload application
+        uses: actions/upload-artifact@v4
+        with:
+          name: iocx-win-x64
+          path: ./publish
+          retention-days: 7
+
+  secrets-scan:
+    # Fails the build if a credential-shaped value is committed. This is a coarse net; it
+    # exists to catch the obvious mistake of pasting a real key into a tracked file.
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check for committed configuration containing keys
+        run: |
+          if git ls-files --error-unmatch appsettings.json 2>/dev/null; then
+            echo "::error::appsettings.json is tracked. It may contain API keys; only appsettings.example.json belongs in git."
+            exit 1
+          fi
+          if git ls-files --error-unmatch .env 2>/dev/null; then
+            echo "::error::.env is tracked and may contain credentials."
+            exit 1
+          fi
+          echo "No credential-bearing configuration files are tracked."
+
+      - name: Check for API-key-shaped literals in source
+        run: |
+          # VirusTotal keys are 64 hex characters. Allow them in test fixtures and docs,
+          # where documented sample hashes legitimately look the same.
+          matches=$(grep -rIn --include='*.cs' --include='*.json' --include='*.xaml' \
+            -E '(api[_-]?key|apikey|secret|token)[[:space:]]*[=:][[:space:]]*"[A-Za-z0-9_\-]{20,}"' \
+            src/ 2>/dev/null || true)
+
+          if [ -n "$matches" ]; then
+            echo "::error::Possible hardcoded credential:"
+            echo "$matches"
+            exit 1
+          fi
+          echo "No hardcoded credentials found in src/."
+
+      - name: Check for committed database files
+        run: |
+          matches=$(git ls-files '*.db' '*.sqlite' '*.sqlite3' || true)
+          if [ -n "$matches" ]; then
+            echo "::error::Database files are tracked; they may contain investigated indicators:"
+            echo "$matches"
+            exit 1
+          fi
+          echo "No database files are tracked."
