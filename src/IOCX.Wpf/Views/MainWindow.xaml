@@ -1,0 +1,25 @@
+<Window x:Class="IOCX.Wpf.Views.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="IOC-X" Height="700" Width="1200" MinHeight="500" MinWidth="900">
+    <Grid>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="200"/>
+            <ColumnDefinition Width="*"/>
+        </Grid.ColumnDefinitions>
+        
+        <!-- Navigation -->
+        <Border Grid.Column="0" Background="#FF1E1E1E" Padding="10">
+            <StackPanel>
+                <TextBlock Text="IOC-X" Foreground="White" FontSize="20" FontWeight="Bold" Margin="0,0,0,20"/>
+                <Button Content="Dashboard" Command="{Binding NavigateDashboardCommand}" Style="{StaticResource NavButtonStyle}"/>
+                <Button Content="Investigate" Command="{Binding NavigateInvestigateCommand}" Style="{StaticResource NavButtonStyle}"/>
+                <Button Content="History" Command="{Binding NavigateHistoryCommand}" Style="{StaticResource NavButtonStyle}"/>
+                <Button Content="Settings" Command="{Binding NavigateSettingsCommand}" Style="{StaticResource NavButtonStyle}"/>
+            </StackPanel>
+        </Border>
+        
+        <!-- Content -->
+        <ContentControl Grid.Column="1" Content="{Binding CurrentView}"/>
+    </Grid>
+</Window>
