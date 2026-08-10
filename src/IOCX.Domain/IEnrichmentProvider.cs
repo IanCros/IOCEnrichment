@@ -13,6 +13,12 @@ public sealed class ProviderResult
 
     public string? NormalizedData { get; init; }
 
+    /// <summary>
+    /// Structured facts from the response. Scoring, correlation, and reporting read this.
+    /// NormalizedData is for display only and nothing should parse it.
+    /// </summary>
+    public ProviderFindings? Findings { get; init; }
+
     public string? ErrorMessage { get; init; }
 }
 
