@@ -21,10 +21,33 @@ public class AppDbContext : DbContext
 
     public DbSet<EnrichmentCacheEntryEntity> EnrichmentCacheEntries => Set<EnrichmentCacheEntryEntity>();
 
+    /// <summary>
+    /// Gets the Evidence DbSet. Evidence is stored per investigation so a historical
+    /// assessment can be re-read with the reasoning that produced it.
+    /// </summary>
+    public DbSet<EvidenceEntity> Evidence => Set<EvidenceEntity>();
+
     /// <inheritdoc />
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
+
+        // Evidence
+        modelBuilder.Entity<EvidenceEntity>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.Category).IsRequired().HasMaxLength(50);
+            entity.Property(e => e.Description).IsRequired();
+            entity.Property(e => e.Severity).IsRequired().HasMaxLength(50);
+            entity.Property(e => e.Provider).IsRequired().HasMaxLength(100);
+
+            entity.HasOne(e => e.Investigation)
+                .WithMany()
+                .HasForeignKey(e => e.InvestigationId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasIndex(e => e.InvestigationId);
+        });
 
         // IOC
         modelBuilder.Entity<IocEntity>(entity =>
