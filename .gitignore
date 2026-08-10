@@ -82,3 +82,20 @@ artifacts/
 ## Others
 *.DS_Store
 Thumbs.db
+
+## IOC-X local data and secrets
+## The SQLite database holds investigation history and cached provider
+## responses, which may contain indicators the analyst investigated.
+*.db
+*.db-shm
+*.db-wal
+iocx.db
+
+## Real configuration may carry API keys; only the example file is tracked.
+appsettings.json
+appsettings.*.json
+!appsettings.example.json
+.env
+.env.*
+!.env.example
+secrets.json
