@@ -22,7 +22,6 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\IOCX.Domain\IOCX.Domain.csproj" />
-    <ProjectReference Include="..\..\src\IOCX.Infrastructure\IOCX.Infrastructure.csproj" />
   </ItemGroup>
 
 </Project>

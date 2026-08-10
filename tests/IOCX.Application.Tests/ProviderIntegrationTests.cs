@@ -610,25 +610,37 @@ public class ProviderIntegrationTests
             _content = content;
         }
 
-        public Task<HttpResponseResult> GetAsync(string url, CancellationToken cancellationToken = default)
+        public IReadOnlyDictionary<string, string>? LastHeaders { get; private set; }
+
+        public string? LastUrl { get; private set; }
+
+        public Task<HttpResponseResult> GetAsync(
+            string url,
+            IReadOnlyDictionary<string, string>? headers = null,
+            CancellationToken cancellationToken = default)
         {
-            return Task.FromResult(new HttpResponseResult
-            {
-                StatusCode = _status,
-                Content = _content,
-                ErrorMessage = _status == HttpStatusCode.OK ? null : $"HTTP {(int)_status}"
-            });
+            LastUrl = url;
+            LastHeaders = headers;
+            return Task.FromResult(Respond());
         }
 
-        public Task<HttpResponseResult> PostAsync(string url, string? content = null, CancellationToken cancellationToken = default)
+        public Task<HttpResponseResult> PostAsync(
+            string url,
+            string? content = null,
+            IReadOnlyDictionary<string, string>? headers = null,
+            CancellationToken cancellationToken = default)
         {
-            return Task.FromResult(new HttpResponseResult
-            {
-                StatusCode = _status,
-                Content = _content,
-                ErrorMessage = _status == HttpStatusCode.OK ? null : $"HTTP {(int)_status}"
-            });
+            LastUrl = url;
+            LastHeaders = headers;
+            return Task.FromResult(Respond());
         }
+
+        private HttpResponseResult Respond() => new()
+        {
+            StatusCode = _status,
+            Content = _content,
+            ErrorMessage = _status == HttpStatusCode.OK ? null : $"HTTP {(int)_status}"
+        };
 
         public void Dispose() { }
     }

@@ -11,6 +11,30 @@ public class AnalysisEngineTests
     private static Ioc CreateIoc(string value, IocType type) => new(value, value, type);
     private static IRateLimiter CreateNoOpRateLimiter() => new NoOpRateLimiter();
 
+    /// <summary>
+    /// Builds a successful result carrying structured findings. Scoring reads only
+    /// <see cref="ProviderResult.Findings"/>; <paramref name="display"/> mirrors what the
+    /// provider would show in the UI and is what the correlation engine still parses.
+    /// </summary>
+    private static ProviderResult Success(string provider, ProviderFindings findings, string? display = null) =>
+        new()
+        {
+            ProviderName = provider,
+            Status = ProviderStatus.Success,
+            Timestamp = DateTimeOffset.UtcNow,
+            NormalizedData = display,
+            Findings = findings
+        };
+
+    private static ProviderFindings Detections(int malicious, int suspicious = 0, int harmless = 0, int undetected = 0, int? reputation = null) =>
+        new() { Detections = new DetectionFacts(malicious, suspicious, harmless, undetected, reputation) };
+
+    private static ProviderFindings Abuse(int confidencePercent, int? reports = null) =>
+        new() { Abuse = new AbuseFacts(confidencePercent, reports) };
+
+    private static ProviderFindings ThreatMatches(int count, params string[] families) =>
+        new() { ThreatMatches = new ThreatMatchFacts(count, families) };
+
     [Fact]
     public void RiskScoring_CleanIoc_ReturnsInformational()
     {
@@ -32,10 +56,10 @@ public class AnalysisEngineTests
         var ioc = CreateIoc("192.0.2.1", IocType.IPv4);
         var results = new List<ProviderResult>
         {
-            new ProviderResult { ProviderName = "VirusTotal", Status = ProviderStatus.Success, NormalizedData = "Malicious: 15" + Environment.NewLine + "Suspicious: 3" + Environment.NewLine + "Harmless: 65" + Environment.NewLine + "Undetected: 20" + Environment.NewLine + "Reputation: -50", Timestamp = DateTimeOffset.UtcNow },
-            new ProviderResult { ProviderName = "AbuseIPDB", Status = ProviderStatus.Success, NormalizedData = "Abuse Confidence: 85%" + Environment.NewLine + "Country: US", Timestamp = DateTimeOffset.UtcNow },
-            new ProviderResult { ProviderName = "ThreatFox", Status = ProviderStatus.Success, NormalizedData = "Matches: 2" + Environment.NewLine + "Malware: ExampleMalware", Timestamp = DateTimeOffset.UtcNow },
-            new ProviderResult { ProviderName = "URLhaus", Status = ProviderStatus.Success, NormalizedData = "Matches: 1" + Environment.NewLine + "Malware: Trojan", Timestamp = DateTimeOffset.UtcNow }
+            Success("VirusTotal", Detections(malicious: 15, suspicious: 3, harmless: 65, undetected: 20, reputation: -50)),
+            Success("AbuseIPDB", Abuse(85)),
+            Success("ThreatFox", ThreatMatches(2, "ExampleMalware")),
+            Success("URLhaus", ThreatMatches(1, "Trojan"))
         };
 
         var assessment = service.CalculateRisk(ioc, results);
@@ -52,9 +76,9 @@ public class AnalysisEngineTests
         var ioc = CreateIoc("192.0.2.1", IocType.IPv4);
         var results = new List<ProviderResult>
         {
-            new ProviderResult { ProviderName = "VirusTotal", Status = ProviderStatus.Success, NormalizedData = "Malicious: 1" + Environment.NewLine + "Suspicious: 0" + Environment.NewLine + "Harmless: 100" + Environment.NewLine + "Reputation: 10", Timestamp = DateTimeOffset.UtcNow },
-            new ProviderResult { ProviderName = "AbuseIPDB", Status = ProviderStatus.Success, NormalizedData = "Abuse Confidence: 0%" + Environment.NewLine + "Country: US", Timestamp = DateTimeOffset.UtcNow },
-            new ProviderResult { ProviderName = "ThreatFox", Status = ProviderStatus.Success, NormalizedData = "Matches: 0", Timestamp = DateTimeOffset.UtcNow }
+            Success("VirusTotal", Detections(malicious: 1, harmless: 100, reputation: 10)),
+            Success("AbuseIPDB", Abuse(0)),
+            Success("ThreatFox", ThreatMatches(0))
         };
 
         var assessment = service.CalculateRisk(ioc, results);
@@ -69,9 +93,9 @@ public class AnalysisEngineTests
         var ioc = CreateIoc("192.0.2.1", IocType.IPv4);
         var results = new List<ProviderResult>
         {
-            new ProviderResult { ProviderName = "VirusTotal", Status = ProviderStatus.Success, NormalizedData = "Malicious: 10", Timestamp = DateTimeOffset.UtcNow },
+            Success("VirusTotal", Detections(malicious: 10)),
             new ProviderResult { ProviderName = "AbuseIPDB", Status = ProviderStatus.Timeout, ErrorMessage = "Request timed out.", Timestamp = DateTimeOffset.UtcNow },
-            new ProviderResult { ProviderName = "ThreatFox", Status = ProviderStatus.Success, NormalizedData = "Matches: 1", Timestamp = DateTimeOffset.UtcNow }
+            Success("ThreatFox", ThreatMatches(1))
         };
 
         var assessment = service.CalculateRisk(ioc, results);
@@ -88,8 +112,8 @@ public class AnalysisEngineTests
         var ioc = CreateIoc("192.0.2.1", IocType.IPv4);
         var results = new List<ProviderResult>
         {
-            new ProviderResult { ProviderName = "VirusTotal", Status = ProviderStatus.Success, NormalizedData = "Malicious: 10", Timestamp = DateTimeOffset.UtcNow },
-            new ProviderResult { ProviderName = "AbuseIPDB", Status = ProviderStatus.Success, NormalizedData = "Abuse Confidence: 85%", Timestamp = DateTimeOffset.UtcNow }
+            Success("VirusTotal", Detections(malicious: 10)),
+            Success("AbuseIPDB", Abuse(85))
         };
 
         var riskAssessment = riskService.CalculateRisk(ioc, results);
@@ -107,7 +131,7 @@ public class AnalysisEngineTests
         var ioc = CreateIoc("192.0.2.1", IocType.IPv4);
         var results = new List<ProviderResult>
         {
-            new ProviderResult { ProviderName = "VirusTotal", Status = ProviderStatus.Success, NormalizedData = "Malicious: 10", Timestamp = DateTimeOffset.UtcNow },
+            Success("VirusTotal", Detections(malicious: 10)),
             new ProviderResult { ProviderName = "AbuseIPDB", Status = ProviderStatus.Timeout, Timestamp = DateTimeOffset.UtcNow },
             new ProviderResult { ProviderName = "ThreatFox", Status = ProviderStatus.Unauthorized, Timestamp = DateTimeOffset.UtcNow }
         };
@@ -192,9 +216,9 @@ public class AnalysisEngineTests
         var ioc = CreateIoc("example.com", IocType.Domain);
         var results = new List<ProviderResult>
         {
-            new ProviderResult { ProviderName = "VirusTotal", Status = ProviderStatus.Success, NormalizedData = "Malicious: 10" + Environment.NewLine + "Reputation: -30", Timestamp = DateTimeOffset.UtcNow },
-            new ProviderResult { ProviderName = "AbuseIPDB", Status = ProviderStatus.Success, NormalizedData = "Abuse Confidence: 90%", Timestamp = DateTimeOffset.UtcNow },
-            new ProviderResult { ProviderName = "DNS", Status = ProviderStatus.Success, NormalizedData = "A:" + Environment.NewLine + "93.184.216.34", Timestamp = DateTimeOffset.UtcNow }
+            Success("VirusTotal", Detections(malicious: 10, reputation: -30)),
+            Success("AbuseIPDB", Abuse(90)),
+            new ProviderResult { ProviderName = "DNS", Status = ProviderStatus.Success, NormalizedData = "A:" + Environment.NewLine + "192.0.2.10", Timestamp = DateTimeOffset.UtcNow }
         };
 
         var result = await analysisService.AnalyzeAsync(ioc, results);
@@ -220,7 +244,10 @@ public class AnalysisEngineTests
         var ioc = CreateIoc("example.com", IocType.Domain);
         var results = new List<ProviderResult>
         {
-            new ProviderResult { ProviderName = "ThreatFox", Status = ProviderStatus.Success, NormalizedData = "Matches: 1" + Environment.NewLine + "Malware: TestMalware", Timestamp = DateTimeOffset.UtcNow }
+            Success(
+                "ThreatFox",
+                ThreatMatches(1, "TestMalware"),
+                display: "Matches: 1" + Environment.NewLine + "Malware: TestMalware")
         };
 
         var result1 = await analysisService.AnalyzeAsync(ioc, results);

@@ -380,11 +380,50 @@ public class InfrastructureProvidersTests
     {
         var client = CreateMockClient(HttpStatusCode.OK, "{}");
         var provider = new RdapProvider(client, CreateNoOpRateLimiter());
-        var ioc = CreateIoc("192.0.2.1", IocType.IPv4);
+
+        // RDAP has no record type for a file hash.
+        var ioc = CreateIoc("d41d8cd98f00b204e9800998ecf8427e", IocType.Md5);
 
         var result = await provider.EnrichAsync(ioc);
 
         Assert.Equal(ProviderStatus.Unsupported, result.Status);
+    }
+
+    [Fact]
+    public async Task Rdap_IpAddress_QueriesAllocationEndpoint()
+    {
+        var client = new MockHttpClient(
+            HttpStatusCode.OK,
+            "{\"handle\":\"NET-192-0-2-0-1\",\"name\":\"TEST-NET-1\",\"country\":\"US\"," +
+            "\"startAddress\":\"192.0.2.0\",\"endAddress\":\"192.0.2.255\"}");
+
+        var provider = new RdapProvider(client, CreateNoOpRateLimiter());
+
+        var result = await provider.EnrichAsync(CreateIoc("192.0.2.1", IocType.IPv4));
+
+        Assert.Equal(ProviderStatus.Success, result.Status);
+
+        // Addresses live under /ip/, not /domain/ — querying the wrong path returns 404.
+        Assert.Contains("/ip/192.0.2.1", client.LastUrl!, StringComparison.Ordinal);
+        Assert.Contains("TEST-NET-1", result.NormalizedData!);
+        Assert.Equal("US", result.Findings?.Infrastructure?.CountryCode);
+    }
+
+    [Fact]
+    public async Task Rdap_Domain_QueriesDomainEndpointAndReportsRegistration()
+    {
+        var client = new MockHttpClient(
+            HttpStatusCode.OK,
+            "{\"handle\":\"EXAMPLE-COM\",\"events\":[{\"eventAction\":\"registration\"," +
+            "\"eventDate\":\"1995-08-14T04:00:00Z\"}],\"nameservers\":[{\"ldhName\":\"a.iana-servers.net\"}]}");
+
+        var provider = new RdapProvider(client, CreateNoOpRateLimiter());
+
+        var result = await provider.EnrichAsync(CreateIoc("example.com", IocType.Domain));
+
+        Assert.Equal(ProviderStatus.Success, result.Status);
+        Assert.Contains("/domain/example.com", client.LastUrl!, StringComparison.Ordinal);
+        Assert.Contains("a.iana-servers.net", result.Findings?.Registration?.Nameservers ?? []);
     }
 
     [Fact]
@@ -437,16 +476,18 @@ public class InfrastructureProvidersTests
 
         var results = await service.EnrichAsync(ioc);
 
-        // IPv4 is supported by VirusTotal, AbuseIPDB, ThreatFox, Shodan, URLhaus, DNS (6 providers)
-        // RDAP only supports domains, so it is excluded for IPv4.
-        Assert.Equal(6, results.Count);
+        // All seven providers answer for an IPv4 address: RDAP serves address allocations
+        // from its /ip/ endpoint as well as domain registrations.
+        Assert.Equal(7, results.Count);
         Assert.Contains(results, r => r.ProviderName == "VirusTotal" && r.Status == ProviderStatus.Success);
         Assert.Contains(results, r => r.ProviderName == "AbuseIPDB" && r.Status == ProviderStatus.Success);
         Assert.Contains(results, r => r.ProviderName == "ThreatFox" && r.Status == ProviderStatus.Success);
-        Assert.Contains(results, r => r.ProviderName == "Shodan" && r.Status == ProviderStatus.RateLimited);
         Assert.Contains(results, r => r.ProviderName == "URLhaus" && r.Status == ProviderStatus.Success);
         Assert.Contains(results, r => r.ProviderName == "DNS" && r.Status == ProviderStatus.Success);
-        Assert.DoesNotContain(results, r => r.ProviderName == "RDAP");
+        Assert.Contains(results, r => r.ProviderName == "RDAP" && r.Status == ProviderStatus.Success);
+
+        // One provider being rate limited must not disturb the others.
+        Assert.Contains(results, r => r.ProviderName == "Shodan" && r.Status == ProviderStatus.RateLimited);
     }
 
     private sealed class MockHttpClient : IHttpClient
@@ -460,25 +501,37 @@ public class InfrastructureProvidersTests
             _content = content;
         }
 
-        public Task<HttpResponseResult> GetAsync(string url, CancellationToken cancellationToken = default)
+        public IReadOnlyDictionary<string, string>? LastHeaders { get; private set; }
+
+        public string? LastUrl { get; private set; }
+
+        public Task<HttpResponseResult> GetAsync(
+            string url,
+            IReadOnlyDictionary<string, string>? headers = null,
+            CancellationToken cancellationToken = default)
         {
-            return Task.FromResult(new HttpResponseResult
-            {
-                StatusCode = _status,
-                Content = _content,
-                ErrorMessage = _status == HttpStatusCode.OK ? null : $"HTTP {(int)_status}"
-            });
+            LastUrl = url;
+            LastHeaders = headers;
+            return Task.FromResult(Respond());
         }
 
-        public Task<HttpResponseResult> PostAsync(string url, string? content = null, CancellationToken cancellationToken = default)
+        public Task<HttpResponseResult> PostAsync(
+            string url,
+            string? content = null,
+            IReadOnlyDictionary<string, string>? headers = null,
+            CancellationToken cancellationToken = default)
         {
-            return Task.FromResult(new HttpResponseResult
-            {
-                StatusCode = _status,
-                Content = _content,
-                ErrorMessage = _status == HttpStatusCode.OK ? null : $"HTTP {(int)_status}"
-            });
+            LastUrl = url;
+            LastHeaders = headers;
+            return Task.FromResult(Respond());
         }
+
+        private HttpResponseResult Respond() => new()
+        {
+            StatusCode = _status,
+            Content = _content,
+            ErrorMessage = _status == HttpStatusCode.OK ? null : $"HTTP {(int)_status}"
+        };
 
         public void Dispose() { }
     }
