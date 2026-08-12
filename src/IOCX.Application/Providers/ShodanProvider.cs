@@ -101,7 +101,7 @@ public sealed class ShodanProvider : IEnrichmentProvider
                     Status = ProviderStatus.Error,
                     Timestamp = DateTimeOffset.UtcNow,
                     Duration = duration,
-                    ErrorMessage = $"HTTP {(int)response.StatusCode}: {response.ErrorMessage}"
+                    ErrorMessage = Redact($"HTTP {(int)response.StatusCode}: {response.ErrorMessage}")
                 }
             };
         }
@@ -122,10 +122,24 @@ public sealed class ShodanProvider : IEnrichmentProvider
                 ProviderName = Name,
                 Status = ProviderStatus.Error,
                 Timestamp = DateTimeOffset.UtcNow,
-                ErrorMessage = $"Error: {ex.Message}"
+                ErrorMessage = Redact($"Error: {ex.Message}")
             };
         }
     }
+
+    /// <summary>Removes the API key from a message before it can be displayed or persisted.</summary>
+    /// <remarks>
+    /// Shodan authenticates by query-string parameter, so this provider is the only one whose
+    /// credential travels inside a URL. Exception and transport messages do not normally echo
+    /// the query string, but an error message is written to the investigation record and shown
+    /// in the UI, so the key is stripped rather than trusted not to appear.
+    /// </remarks>
+    private string Redact(string message) =>
+        string.IsNullOrEmpty(_apiKey)
+            ? message
+            : message
+                .Replace(_apiKey, "[redacted]", StringComparison.Ordinal)
+                .Replace(Uri.EscapeDataString(_apiKey), "[redacted]", StringComparison.Ordinal);
 
     private ProviderResult ProcessSuccessResponse(string content, long duration)
     {

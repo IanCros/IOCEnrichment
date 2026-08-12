@@ -12,9 +12,8 @@ public class AnalysisEngineTests
     private static IRateLimiter CreateNoOpRateLimiter() => new NoOpRateLimiter();
 
     /// <summary>
-    /// Builds a successful result carrying structured findings. Scoring reads only
-    /// <see cref="ProviderResult.Findings"/>; <paramref name="display"/> mirrors what the
-    /// provider would show in the UI and is what the correlation engine still parses.
+    /// Builds a successful result carrying structured findings. Scoring reads only Findings.
+    /// The display string is what the correlation engine still parses.
     /// </summary>
     private static ProviderResult Success(string provider, ProviderFindings findings, string? display = null) =>
         new()
@@ -149,7 +148,7 @@ public class AnalysisEngineTests
         var ioc = CreateIoc("example.com", IocType.Domain);
         var results = new List<ProviderResult>
         {
-            new ProviderResult { ProviderName = "DNS", Status = ProviderStatus.Success, NormalizedData = "A:" + Environment.NewLine + "93.184.216.34", Timestamp = DateTimeOffset.UtcNow }
+            new ProviderResult { ProviderName = "DNS", Status = ProviderStatus.Success, NormalizedData = "A:" + Environment.NewLine + "192.0.2.10", Timestamp = DateTimeOffset.UtcNow }
         };
 
         var relationships = correlationService.Correlate(ioc, results);
@@ -181,7 +180,7 @@ public class AnalysisEngineTests
         var ioc = CreateIoc("example.com", IocType.Domain);
         var results = new List<ProviderResult>
         {
-            new ProviderResult { ProviderName = "DNS", Status = ProviderStatus.Success, NormalizedData = "A:" + Environment.NewLine + "93.184.216.34" + Environment.NewLine + "93.184.216.35", Timestamp = DateTimeOffset.UtcNow }
+            new ProviderResult { ProviderName = "DNS", Status = ProviderStatus.Success, NormalizedData = "A:" + Environment.NewLine + "192.0.2.10" + Environment.NewLine + "192.0.2.11", Timestamp = DateTimeOffset.UtcNow }
         };
 
         var relationships = correlationService.Correlate(ioc, results);

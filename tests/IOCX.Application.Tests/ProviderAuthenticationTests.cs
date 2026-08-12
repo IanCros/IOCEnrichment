@@ -6,10 +6,9 @@ using IOCX.Domain;
 
 /// <summary>Asserts that each provider actually transmits its credential.</summary>
 /// <remarks>
-/// Every provider previously accepted an API key, stored it in a field, and never sent it,
-/// so authentication failed against every keyed service. The mocked HTTP client returns 200
-/// regardless of headers, so no test that only inspected the parsed result could catch it.
-/// These tests inspect the outgoing request instead.
+/// Every provider used to accept an API key, store it in a field, and never send it, so
+/// authentication failed everywhere. The mock returns 200 whatever headers arrive, so no test
+/// that only checked the parsed result could catch it. These check the outgoing request.
 /// </remarks>
 public class ProviderAuthenticationTests
 {
@@ -127,16 +126,40 @@ public class ProviderAuthenticationTests
         Assert.DoesNotContain(FakeKey, result.ErrorMessage ?? string.Empty, StringComparison.Ordinal);
     }
 
+    [Fact]
+    public async Task ShodanTransportErrors_RedactTheKey()
+    {
+        // Simulates a transport-layer message that does echo the request URL. Error messages
+        // are persisted to the investigation record and shown in the UI, so the key must be
+        // stripped rather than trusted not to appear.
+        // 400 reaches the branch that includes the transport message. The 5xx and auth
+        // codes emit fixed text with nothing to redact.
+        var http = new RecordingHttpClient(
+            content: string.Empty,
+            status: HttpStatusCode.BadRequest,
+            errorMessage: $"Connection failed for https://api.shodan.io/shodan/host/192.0.2.1?key={FakeKey}");
+
+        var result = await new ShodanProvider(http, NoLimit(), FakeKey).EnrichAsync(Ip());
+
+        Assert.DoesNotContain(FakeKey, result.ErrorMessage ?? string.Empty, StringComparison.Ordinal);
+        Assert.Contains("[redacted]", result.ErrorMessage!, StringComparison.Ordinal);
+    }
+
     /// <summary>Captures the outgoing request so tests can assert on what was actually sent.</summary>
     private sealed class RecordingHttpClient : IHttpClient
     {
         private readonly string _content;
         private readonly HttpStatusCode _status;
+        private readonly string? _errorMessage;
 
-        public RecordingHttpClient(string content, HttpStatusCode status = HttpStatusCode.OK)
+        public RecordingHttpClient(
+            string content,
+            HttpStatusCode status = HttpStatusCode.OK,
+            string? errorMessage = null)
         {
             _content = content;
             _status = status;
+            _errorMessage = errorMessage;
         }
 
         public IReadOnlyDictionary<string, string>? LastHeaders { get; private set; }
@@ -168,7 +191,9 @@ public class ProviderAuthenticationTests
         {
             StatusCode = _status,
             Content = _content,
-            ErrorMessage = _status == HttpStatusCode.OK ? null : $"HTTP {(int)_status}"
+            ErrorMessage = _status == HttpStatusCode.OK
+                ? null
+                : _errorMessage ?? $"HTTP {(int)_status}"
         };
 
         public void Dispose()
